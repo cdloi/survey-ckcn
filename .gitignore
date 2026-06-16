@@ -1,0 +1,11 @@
+node_modules/
+__pycache__/
+frontend/dist/
+.env
+*.pyc
+.DS_Store
+.agents/
+notus-angular-main/
+.vite/
+TAI_KHOAN.md
+skills-lock.json
