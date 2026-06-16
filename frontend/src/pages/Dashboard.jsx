@@ -50,12 +50,7 @@ export default function Dashboard() {
               cùng các anh chị cựu sinh viên tham gia khảo sát ý kiến. Những phản hồi của Quý vị
               là cơ sở quan trọng để Khoa không ngừng cải tiến và nâng cao chất lượng đào tạo.
             </p>
-            <button
-              onClick={() => navigate("/respond")}
-              className="mt-8 bg-red-600 hover:bg-red-700 text-white font-bold px-8 py-4 rounded-lg uppercase text-sm shadow-lg transition-all"
-            >
-              Tham gia khảo sát
-            </button>
+
           </div>
         </section>
 
@@ -68,7 +63,7 @@ export default function Dashboard() {
                   <div
                     key={st.key}
                     className="bg-white rounded-xl shadow-md hover:shadow-xl cursor-pointer transition-all hover:-translate-y-1 flex flex-col"
-                    onClick={() => navigate(`/respond?type=${st.key}`)}
+                    onClick={() => navigate(`/respond`)}
                   >
                     <div className="p-6 flex flex-col flex-1">
                       <div className="flex items-center gap-4 mb-4">
