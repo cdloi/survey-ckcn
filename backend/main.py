@@ -327,16 +327,6 @@ def list_responses(request: Request, survey: str = "", major: str = ""):
             "count": len(rows),
         }
 
-        json_dir = os.path.join(BASE_DIR, "data", "responses", key)
-        new_responses = []
-        if os.path.exists(json_dir):
-            for rfile in sorted(os.listdir(json_dir)):
-                if rfile.endswith(".json"):
-                    with open(os.path.join(json_dir, rfile), "r", encoding="utf-8") as f:
-                        new_responses.append(json.load(f))
-        if new_responses:
-            result[key]["new_responses"] = new_responses
-            result[key]["new_count"] = len(new_responses)
     return result
 
 

@@ -121,9 +121,9 @@ export default function AdminPage() {
                   <StatCard
                     icon={Icon}
                     title={SURVEY_LABELS[key]}
-                    value={`${sv.count + (sv.new_count || 0)}`}
+                    value={`${sv.count}`}
                     color={COLORS[key]}
-                    subtitle={`${sv.count} Excel + ${sv.new_count || 0} Web`}
+                    subtitle={`${sv.count} phản hồi`}
                   />
                 </div>
               ) : null;
@@ -189,16 +189,9 @@ export default function AdminPage() {
                     ))}
                   </tr>
                 ))}
-                {(respData[selectedSurvey]?.new_responses || []).map((r, i) => (
-                  <tr key={`new-${i}`} className="border-t border-blueGray-100 hover:bg-blueGray-50 bg-lightBlue-50">
-                    <td className="px-4 py-2">{respData[selectedSurvey].rows.length + i + 1}</td>
-                    <td className="px-4 py-2">{r.email || "N/A"}</td>
-                    <td className="px-4 py-2" colSpan={7}>Phản hồi web</td>
-                  </tr>
-                ))}
               </tbody>
             </table>
-            {(!respData[selectedSurvey]?.rows?.length && !respData[selectedSurvey]?.new_responses?.length) && (
+            {!respData[selectedSurvey]?.rows?.length && (
               <p className="text-center py-8 text-blueGray-400">Không có dữ liệu</p>
             )}
           </div>

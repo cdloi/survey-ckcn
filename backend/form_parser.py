@@ -610,17 +610,42 @@ def save_response(survey_type: str, email: str, answers: dict, base_dir: str, ma
     resp_dir = os.path.join(base_dir, "data", "responses", survey_type)
     os.makedirs(resp_dir, exist_ok=True)
 
+    now = datetime.now()
     record = {
         "id": str(uuid.uuid4()),
         "email": email,
         "survey_type": survey_type,
         "major": major,
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": now.isoformat(),
         "answers": answers,
     }
 
-    fname = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{record['id'][:8]}.json"
+    fname = f"{now.strftime('%Y%m%d_%H%M%S')}_{record['id'][:8]}.json"
     path = os.path.join(resp_dir, fname)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(record, f, ensure_ascii=False, indent=2)
+
+    # Also append to Excel so data appears in admin dashboard
+    try:
+        fname = SURVEY_FILES.get(survey_type)
+        if fname:
+            xl_path = os.path.join(base_dir, fname)
+            if os.path.exists(xl_path):
+                df = pd.read_excel(xl_path)
+                num_cols = len(df.columns)
+                row = [None] * num_cols
+                row[0] = now
+                for col_key, val in answers.items():
+                    try:
+                        ci = int(col_key)
+                        if 0 <= ci < num_cols:
+                            row[ci] = val
+                    except (ValueError, TypeError):
+                        pass
+
+                df.loc[len(df)] = row
+                df.to_excel(xl_path, index=False)
+    except Exception:
+        pass
+
     return record["id"]
