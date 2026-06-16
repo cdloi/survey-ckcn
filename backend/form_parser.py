@@ -137,21 +137,32 @@ def detect_plo_ranges(cols, evaluate_col):
     if evaluate_col is None or evaluate_col >= len(cols) - 1:
         return []
     first_col_idx = evaluate_col + 1
-    first_prefix = extract_prefix(str(cols[first_col_idx]))
-    if first_prefix is None:
-        return []
-    second_occurrence = None
-    for i in range(first_col_idx + 1, len(cols)):
+    prefix_list = []
+    for i in range(first_col_idx, len(cols)):
         p = extract_prefix(str(cols[i]))
-        if p is not None and p == first_prefix:
-            second_occurrence = i
+        if p is None:
             break
-    if second_occurrence is None:
+        prefix_list.append((i, p))
+    if not prefix_list:
         return []
-    group_size = second_occurrence - first_col_idx
-    remaining = len(cols) - first_col_idx
-    num_groups = remaining // group_size
-    return [(first_col_idx + g * group_size, first_col_idx + (g + 1) * group_size) for g in range(num_groups)]
+    first_prefix = prefix_list[0][1]
+    boundaries = [first_col_idx]
+    for i in range(1, len(prefix_list)):
+        col_idx, p = prefix_list[i]
+        if p == first_prefix and prefix_list[i-1][1] != first_prefix:
+            boundaries.append(col_idx)
+    last_idx = prefix_list[-1][0] + 1
+    boundaries.append(last_idx)
+    groups = []
+    for i in range(len(boundaries) - 1):
+        groups.append((boundaries[i], boundaries[i+1]))
+    if len(groups) > 1:
+        expected_size = groups[0][1] - groups[0][0]
+        for i in range(len(groups)):
+            actual = groups[i][1] - groups[i][0]
+            if actual > expected_size:
+                groups[i] = (groups[i][0], groups[i][0] + expected_size)
+    return groups
 
 
 def build_form(name: str, base_dir: str, major: str = ""):
