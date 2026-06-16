@@ -30,6 +30,12 @@ SURVEY_INFO = {
     },
 }
 
+SURVEY_EVALUATE_COL = {
+    "alumni": 32,
+    "teacher": 6,
+    "business": 45,
+}
+
 
 def extract_prefix(col_name: str):
     m = re.match(r"^(\d+/\d+)\s*\.?\s*([^\[]*)", str(col_name))
@@ -110,7 +116,45 @@ def get_question_type(col_name, vals, n_unique, dtype, col_idx=None, text_cols=N
         }
 
 
-def build_form(name: str, base_dir: str):
+def get_evaluate_majors(name: str, base_dir: str):
+    fname = SURVEY_FILES.get(name)
+    if not fname:
+        return []
+    path = os.path.join(base_dir, fname)
+    if not os.path.exists(path):
+        return []
+    eval_col = SURVEY_EVALUATE_COL.get(name)
+    if eval_col is None:
+        return []
+    df = pd.read_excel(path)
+    if eval_col >= len(df.columns):
+        return []
+    vals = df.iloc[:, eval_col].dropna().unique()
+    return sorted([str(v).strip() for v in vals if str(v).strip()])
+
+
+def detect_plo_ranges(cols, evaluate_col):
+    if evaluate_col is None or evaluate_col >= len(cols) - 1:
+        return []
+    first_col_idx = evaluate_col + 1
+    first_prefix = extract_prefix(str(cols[first_col_idx]))
+    if first_prefix is None:
+        return []
+    second_occurrence = None
+    for i in range(first_col_idx + 1, len(cols)):
+        p = extract_prefix(str(cols[i]))
+        if p is not None and p == first_prefix:
+            second_occurrence = i
+            break
+    if second_occurrence is None:
+        return []
+    group_size = second_occurrence - first_col_idx
+    remaining = len(cols) - first_col_idx
+    num_groups = remaining // group_size
+    return [(first_col_idx + g * group_size, first_col_idx + (g + 1) * group_size) for g in range(num_groups)]
+
+
+def build_form(name: str, base_dir: str, major: str = ""):
     fname = SURVEY_FILES.get(name)
     if not fname:
         return None
@@ -124,9 +168,23 @@ def build_form(name: str, base_dir: str):
     skip_cols = info.get("skip_cols", [0])
     text_cols = info.get("text_cols", [])
 
+    exclude_cols = set(skip_cols)
+    evaluate_col = SURVEY_EVALUATE_COL.get(name)
+
+    if major and evaluate_col is not None:
+        exclude_cols.add(evaluate_col)
+        majors = get_evaluate_majors(name, base_dir)
+        plo_ranges = detect_plo_ranges(cols, evaluate_col)
+        if major in majors:
+            major_idx = majors.index(major)
+            for g_idx, (start, end) in enumerate(plo_ranges):
+                if g_idx != major_idx:
+                    for c in range(start, end):
+                        exclude_cols.add(c)
+
     questions = []
     for i, col_name in enumerate(cols):
-        if i in skip_cols:
+        if i in exclude_cols:
             continue
         vals = df[col_name].dropna()
         if len(vals) == 0:
@@ -534,7 +592,7 @@ def build_dashboard_tables(name: str, base_dir: str, major: str = ""):
     return {"survey": name, "tables": tables, "total_responses": len(df)}
 
 
-def save_response(survey_type: str, email: str, answers: dict, base_dir: str):
+def save_response(survey_type: str, email: str, answers: dict, base_dir: str, major: str = ""):
     from datetime import datetime
     import uuid
 
@@ -545,6 +603,7 @@ def save_response(survey_type: str, email: str, answers: dict, base_dir: str):
         "id": str(uuid.uuid4()),
         "email": email,
         "survey_type": survey_type,
+        "major": major,
         "timestamp": datetime.now().isoformat(),
         "answers": answers,
     }

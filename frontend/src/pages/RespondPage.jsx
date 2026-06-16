@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { ArrowLeft, ClipboardList, Send, CheckCircle } from "lucide-react";
+import { ArrowLeft, ClipboardList, Send, CheckCircle, BookOpen } from "lucide-react";
 
 const SURVEY_TYPES = [
   { key: "alumni", label: "Cựu Sinh viên", desc: "Dành cho cựu sinh viên các ngành của Khoa CKCN" },
@@ -11,8 +11,11 @@ const SURVEY_TYPES = [
 export default function RespondPage() {
   const [searchParams] = useSearchParams();
   const preselectedType = searchParams.get("type") || "";
-  const [step, setStep] = useState(preselectedType ? "form" : "select");
+  const [step, setStep] = useState(preselectedType ? "select_major" : "select");
   const [surveyType, setSurveyType] = useState(preselectedType);
+  const [selectedMajor, setSelectedMajor] = useState("");
+  const [majors, setMajors] = useState([]);
+  const [majorLabel, setMajorLabel] = useState("Ngành khảo sát");
   const [email, setEmail] = useState("");
   const [form, setForm] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -24,36 +27,62 @@ export default function RespondPage() {
 
   const selectSurvey = (key) => {
     setSurveyType(key);
-    setStep("form");
+    setLoading(true);
+    setError("");
+    fetch(`/api/survey/${key}/evaluate-majors`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.error) {
+          setError(d.error);
+        } else if (d.majors && d.majors.length > 0) {
+          setMajors(d.majors);
+          setMajorLabel(d.label || "Ngành khảo sát");
+          setStep("select_major");
+        } else {
+          setStep("form");
+          loadForm(key, "");
+        }
+        setLoading(false);
+      })
+      .catch(() => {
+        setError("Không thể tải danh sách ngành");
+        setLoading(false);
+      });
   };
 
-  useEffect(() => {
-    if (surveyType) {
-      setLoading(true);
-      fetch(`/api/survey/${surveyType}/form`)
-        .then((r) => r.json())
-        .then((d) => {
-          if (d.error) {
-            setError(d.error);
-          } else {
-            setForm(d);
-            const initial = {};
-            d.sections.forEach((sec) => {
-              sec.questions.forEach((q) => {
-                if (q.type === "checkbox") initial[q.id] = false;
-                else initial[q.id] = "";
-              });
+  const selectMajor = (major) => {
+    setSelectedMajor(major);
+    loadForm(surveyType, major);
+  };
+
+  const loadForm = (stype, smajor) => {
+    setLoading(true);
+    const url = smajor ? `/api/survey/${stype}/form?major=${encodeURIComponent(smajor)}` : `/api/survey/${stype}/form`;
+    fetch(url)
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.error) {
+          setError(d.error);
+        } else {
+          setForm(d);
+          const initial = {};
+          d.sections.forEach((sec) => {
+            sec.questions.forEach((q) => {
+              if (q.type === "checkbox") initial[q.id] = false;
+              else initial[q.id] = "";
             });
-            setAnswers(initial);
-          }
-          setLoading(false);
-        })
-        .catch(() => {
-          setError("Không thể tải form khảo sát");
-          setLoading(false);
-        });
-    }
-  }, [surveyType]);
+          });
+          setAnswers(initial);
+          setSectionIdx(0);
+          setStep("form");
+        }
+        setLoading(false);
+      })
+      .catch(() => {
+        setError("Không thể tải form khảo sát");
+        setLoading(false);
+      });
+  };
 
   const setAnswer = (id, value) => {
     setAnswers((prev) => ({ ...prev, [id]: value }));
@@ -87,7 +116,7 @@ export default function RespondPage() {
       const res = await fetch("/api/response/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, survey_type: surveyType, answers }),
+        body: JSON.stringify({ email, survey_type: surveyType, major: selectedMajor, answers }),
       });
       const data = await res.json();
       if (data.error) setError(data.error);
@@ -192,6 +221,43 @@ export default function RespondPage() {
     );
   }
 
+  if (step === "select_major") {
+    return (
+      <>
+        {renderHeader(SURVEY_TYPES.find((s) => s.key === surveyType)?.label || "Khảo sát", `Vui lòng chọn ${majorLabel.toLowerCase()}`)}
+        <main className="max-w-4xl mx-auto px-6 py-8">
+          {loading ? (
+            <p className="text-center text-blueGray-400">Đang tải danh sách ngành...</p>
+          ) : (
+            <>
+              <p className="text-sm text-blueGray-500 mb-6 text-center">
+                {`Vui lòng chọn ${majorLabel.toLowerCase()} mà bạn muốn tham gia khảo sát:`}
+              </p>
+              <div className="grid md:grid-cols-2 gap-4">
+                {majors.map((major) => (
+                  <button key={major} onClick={() => selectMajor(major)}
+                    className="bg-white rounded-xl shadow-md hover:shadow-xl p-5 text-left transition-all hover:-translate-y-1 border border-blueGray-100 flex items-start gap-4">
+                    <BookOpen size={24} className="text-blueGray-400 mt-0.5 shrink-0" />
+                    <div>
+                      <h3 className="text-base font-semibold text-blueGray-700">{major}</h3>
+                      <span className="text-blueGray-500 text-sm font-semibold mt-2 block">Chọn →</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+              <div className="text-center mt-6">
+                <button onClick={() => setStep("select")}
+                  className="text-sm text-blueGray-400 hover:text-blueGray-600 underline">
+                  ← Quay lại chọn loại khảo sát
+                </button>
+              </div>
+            </>
+          )}
+        </main>
+      </>
+    );
+  }
+
   if (loading) {
     return (
       <>
@@ -241,6 +307,13 @@ export default function RespondPage() {
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="nhap@email.com" required
             className="flex-1 px-3 py-2 border border-blueGray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blueGray-400" />
         </div>
+
+        {selectedMajor && (
+          <div className="flex items-center gap-2 bg-blueGray-50 border border-blueGray-200 rounded-xl px-5 py-3 mb-6 text-sm text-blueGray-600">
+            <BookOpen size={16} />
+            <span className="font-medium">{majorLabel}:</span> {selectedMajor}
+          </div>
+        )}
 
         <div className="bg-white rounded-xl shadow-md border border-blueGray-100 p-6 mb-6">
           <h2 className="text-lg font-semibold text-blueGray-700 pb-3 mb-4 border-b border-blueGray-100">{currentSection?.label}</h2>

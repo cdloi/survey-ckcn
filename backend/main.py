@@ -11,7 +11,7 @@ import csv
 import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from auth import USERS, create_token, get_current_user, require_admin, require_manager, require_any
-from form_parser import build_form, build_grouped_summary, build_dashboard_tables, save_response
+from form_parser import build_form, build_grouped_summary, build_dashboard_tables, save_response, get_evaluate_majors
 
 
 class LoginBody(BaseModel):
@@ -22,6 +22,7 @@ class LoginBody(BaseModel):
 class SubmitBody(BaseModel):
     email: str = ""
     survey_type: str = ""
+    major: str = ""
     answers: dict = {}
 
 
@@ -264,9 +265,17 @@ def get_summary(request: Request, name: str, major: str = ""):
     return summary
 
 
+@app.get("/api/survey/{name}/evaluate-majors")
+def get_survey_evaluate_majors(name: str):
+    if name not in SURVEY_FILES:
+        return {"error": "Survey not found"}
+    majors = get_evaluate_majors(name, BASE_DIR)
+    return {"majors": majors, "label": MAJOR_LABELS.get(name, "Ngành khảo sát")}
+
+
 @app.get("/api/survey/{name}/form")
-def get_form(name: str):
-    form = build_form(name, BASE_DIR)
+def get_form(name: str, major: str = ""):
+    form = build_form(name, BASE_DIR, major)
     if form is None:
         return {"error": "Survey not found"}
     return form
@@ -375,7 +384,7 @@ def submit_response(body: SubmitBody):
         return {"error": "Thiếu thông tin bắt buộc"}
     if body.survey_type not in SURVEY_FILES:
         return {"error": "Loại khảo sát không hợp lệ"}
-    resp_id = save_response(body.survey_type, body.email, body.answers, BASE_DIR)
+    resp_id = save_response(body.survey_type, body.email, body.answers, BASE_DIR, body.major)
     return {"success": True, "id": resp_id, "message": "Cảm ơn bạn đã tham gia khảo sát!"}
 
 
